@@ -3,7 +3,7 @@
   "name": "MiStudio Sync",
   "version": "0.8.0",
   "minAppVersion": "1.4.0",
-  "description": "Sincroniza tus carpetas, apuntes, tareas y calendario de MiStudio con tu vault de Obsidian (bajada siempre; subida opcional two-way, incl. el check de tareas), con nota diaria que incluye el plan de estudio de Phil, sync selectivo por carpeta y API key de larga duración.",
+  "description": "Sincroniza carpetas, apuntes, tareas y calendario de MiStudio con tu vault: bajada siempre, subida two-way opcional (incl. check de tareas), nota diaria con el plan de Phil y sync selectivo por carpeta.",
   "author": "MiStudio",
   "authorUrl": "https://mistudiostudy.vercel.app",
   "isDesktopOnly": false
