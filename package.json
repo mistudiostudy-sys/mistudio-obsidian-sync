@@ -1,6 +1,6 @@
 {
   "name": "mistudio-obsidian-sync",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Plugin de Obsidian que sincroniza el contenido de MiStudio al vault (two-way opcional).",
   "main": "main.js",
   "scripts": {

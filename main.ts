@@ -185,7 +185,7 @@ function htmlToMarkdown(html: string): string {
 
   const childInline = (el: HTMLElement): string => Array.from(el.childNodes).map(inline).join('')
   const inline = (node: Node): string => {
-    if (node.nodeType === Node.TEXT_NODE) return (node.textContent || '').replace(/​/g, '')
+    if (node.nodeType === Node.TEXT_NODE) return (node.textContent || '').replace(/\u200B/g, '')
     if (node.nodeType !== Node.ELEMENT_NODE) return ''
     const el = node as HTMLElement
     const inner = childInline(el)
@@ -233,7 +233,7 @@ function htmlToMarkdown(html: string): string {
 
   const walk = (el: HTMLElement) => {
     for (const node of Array.from(el.childNodes)) {
-      if (node.nodeType === Node.TEXT_NODE) { const t = (node.textContent || '').replace(/​/g, '').trim(); if (t) push(t); continue }
+      if (node.nodeType === Node.TEXT_NODE) { const t = (node.textContent || '').replace(/\u200B/g, '').trim(); if (t) push(t); continue }
       if (node.nodeType !== Node.ELEMENT_NODE) continue
       const e = node as HTMLElement
       const tag = e.tagName
@@ -244,7 +244,7 @@ function htmlToMarkdown(html: string): string {
       if (tag === 'BLOCKQUOTE') { push('> ' + childInline(e).trim().replace(/\n/g, '\n> ')); continue }
       if (e.classList.contains('ms-check')) {
         const checked = e.getAttribute('data-checked') === 'true'
-        const txt = (e.querySelector('.ms-check-text')?.textContent || '').replace(/​/g, '').trim()
+        const txt = (e.querySelector('.ms-check-text')?.textContent || '').replace(/\u200B/g, '').trim()
         push(`- [${checked ? 'x' : ' '}] ${txt}`); continue
       }
       if (e.classList.contains('ms-pdf-chip')) { push(`📄 ${(e.getAttribute('data-msname') || e.textContent || 'PDF').trim()}`); continue }
@@ -307,7 +307,8 @@ export default class MiStudioSyncPlugin extends Plugin {
       const r = await requestUrl({ url: `${root}/api/obsidian/export?date=${todayLocalISO()}`, method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, throw: false })
       if (r.status === 401) { new Notice('MiStudio: clave inválida o caducada.'); return }
       if (r.status >= 400) { new Notice(`MiStudio: error ${r.status}.`); return }
-      res = r.json as unknown as ExportResponse
+      const data: unknown = r.json
+      res = data as ExportResponse
     } catch (err) { new Notice('MiStudio: no se pudo conectar (revisa la URL).'); console.error('[MiStudio Sync]', err); return }
     if (!res?.ok || !Array.isArray(res.folders)) { new Notice('MiStudio: respuesta inesperada.'); return }
 
@@ -319,8 +320,8 @@ export default class MiStudioSyncPlugin extends Plugin {
     // que pueden vivir fuera de la carpeta destino → así no se duplican).
     const idToFile = new Map<string, TFile>()
     for (const f of this.app.vault.getMarkdownFiles()) {
-      const id = this.app.metadataCache.getFileCache(f)?.frontmatter?.mistudio_id
-      if (id) { idToFile.set(String(id), f); continue }
+      const id: unknown = this.app.metadataCache.getFileCache(f)?.frontmatter?.mistudio_id
+      if (typeof id === 'string' && id) { idToFile.set(id, f); continue }
       if (!f.path.startsWith(baseDir + '/')) continue
       try {
         const { fm } = splitFrontmatter(await this.app.vault.cachedRead(f))
@@ -586,20 +587,23 @@ export default class MiStudioSyncPlugin extends Plugin {
           body: JSON.stringify(payload), throw: false,
         })
         if (r.status >= 400) { new Notice(`MiStudio: error ${r.status} al crear.`); return }
-        resp = (r.json as unknown as { ok?: boolean; folderId?: string; entryId?: string })
+        const data: unknown = r.json
+        resp = data as { ok?: boolean; folderId?: string; entryId?: string }
       } catch { new Notice('MiStudio: no se pudo crear.'); return }
       if (!resp?.ok || !resp.entryId || !resp.folderId) { new Notice('MiStudio: respuesta inesperada.'); return }
+      const entryId = resp.entryId
+      const folderId = resp.folderId
 
       // Marcar la nota como sincronizada → desde aquí funciona el two-way normal.
       try {
         await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-          fm.mistudio_id = resp!.entryId
-          fm.mistudio_folder_id = resp!.folderId
+          fm.mistudio_id = entryId
+          fm.mistudio_folder_id = folderId
           fm.source = 'mistudio'
           fm.synced = new Date().toISOString()
         })
       } catch (e) { console.error('[MiStudio Sync] frontmatter', (e as Error).message) }
-      this.settings.journal[resp.entryId] = hashStr(md + '\n')
+      this.settings.journal[entryId] = hashStr(md + '\n')
       await this.saveSettings()
       new Notice(choice.kind === 'existing' ? `Añadida a ${choice.name} en MiStudio.` : `Carpeta «${title}» creada en MiStudio.`)
     }).open()
@@ -720,8 +724,8 @@ interface SendChoice { kind: 'new' | 'existing'; id?: string; name: string }
 
 class SendNoteModal extends FuzzySuggestModal<SendChoice> {
   private items: SendChoice[]
-  private onPick: (c: SendChoice) => void
-  constructor(app: App, folders: ExportFolder[], title: string, onPick: (c: SendChoice) => void) {
+  private onPick: (c: SendChoice) => void | Promise<void>
+  constructor(app: App, folders: ExportFolder[], title: string, onPick: (c: SendChoice) => void | Promise<void>) {
     super(app)
     this.onPick = onPick
     this.items = [
@@ -732,5 +736,5 @@ class SendNoteModal extends FuzzySuggestModal<SendChoice> {
   }
   getItems(): SendChoice[] { return this.items }
   getItemText(item: SendChoice): string { return item.name }
-  onChooseItem(item: SendChoice): void { this.onPick(item) }
+  onChooseItem(item: SendChoice): void { void this.onPick(item) }
 }
