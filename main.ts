@@ -268,14 +268,14 @@ export default class MiStudioSyncPlugin extends Plugin {
   async onload() {
     await this.loadSettings()
     this.addRibbonIcon('refresh-cw', 'Sincronizar con MiStudio', () => this.syncNow())
-    this.addCommand({ id: 'mistudio-sync-now', name: 'Sincronizar con MiStudio ahora', callback: () => this.syncNow() })
+    this.addCommand({ id: 'sync-now', name: 'Sincronizar con MiStudio ahora', callback: () => this.syncNow() })
     this.addCommand({
-      id: 'mistudio-send-note',
+      id: 'send-note',
       name: 'Enviar esta nota a MiStudio (carpeta nueva o existente)',
       checkCallback: (checking: boolean) => {
         const file = this.app.workspace.getActiveFile()
         if (!file || file.extension !== 'md') return false
-        if (!checking) this.sendNoteToMiStudio(file)
+        if (!checking) void this.sendNoteToMiStudio(file)
         return true
       },
     })
@@ -287,10 +287,10 @@ export default class MiStudioSyncPlugin extends Plugin {
   scheduleAuto() {
     if (this.timer !== null) { window.clearInterval(this.timer); this.timer = null }
     const mins = Math.max(0, Math.floor(this.settings.autoSyncMinutes || 0))
-    if (mins > 0) { this.timer = window.setInterval(() => this.syncNow(true), mins * 60_000); this.registerInterval(this.timer) }
+    if (mins > 0) { this.timer = window.setInterval(() => void this.syncNow(true), mins * 60_000); this.registerInterval(this.timer) }
   }
 
-  async loadSettings() { this.settings = Object.assign({}, DEFAULTS, await this.loadData()) }
+  async loadSettings() { this.settings = Object.assign({}, DEFAULTS, await this.loadData() as Partial<MiStudioSettings>) }
   async saveSettings() { await this.saveData(this.settings); this.scheduleAuto() }
 
   private token(): string { return (this.settings.apiKey || this.settings.accessToken || '').trim() }
@@ -307,7 +307,7 @@ export default class MiStudioSyncPlugin extends Plugin {
       const r = await requestUrl({ url: `${root}/api/obsidian/export?date=${todayLocalISO()}`, method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, throw: false })
       if (r.status === 401) { new Notice('MiStudio: clave inválida o caducada.'); return }
       if (r.status >= 400) { new Notice(`MiStudio: error ${r.status}.`); return }
-      res = r.json as ExportResponse
+      res = r.json as unknown as ExportResponse
     } catch (err) { new Notice('MiStudio: no se pudo conectar (revisa la URL).'); console.error('[MiStudio Sync]', err); return }
     if (!res?.ok || !Array.isArray(res.folders)) { new Notice('MiStudio: respuesta inesperada.'); return }
 
@@ -399,14 +399,14 @@ export default class MiStudioSyncPlugin extends Plugin {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ updates: pushes }), throw: false,
         })
-        if (r.status < 400) pushed = (r.json?.applied as number) ?? pushes.length
+        if (r.status < 400) pushed = ((r.json as unknown as { applied?: number })?.applied) ?? pushes.length
         else new Notice(`MiStudio: error ${r.status} al subir cambios.`)
       } catch (err) { new Notice('MiStudio: no se pudieron subir los cambios.'); console.error('[MiStudio Sync] push', err) }
     }
 
     // 3) Tareas, calendario y nota diaria (Life Planner ↔ Obsidian).
     let organizer = ''
-    try { organizer = await this.writeOrganizer(res, baseDir, root, token) } catch (e) { console.error('[MiStudio Sync] organizer', e) }
+    try { organizer = await this.writeOrganizer(res, baseDir, root, token) } catch (e) { console.error('[MiStudio Sync] organizer', (e as Error).message) }
 
     this.settings.journal = journal
     await this.saveSettings()
@@ -525,8 +525,8 @@ export default class MiStudioSyncPlugin extends Plugin {
           const local = normalizePath(`${attDir}/${name}`)
           if (this.app.vault.getAbstractFileByPath(local)) { img.setAttribute('data-localpath', local); continue }
           const sig = await requestUrl({ url: `${root}/api/obsidian/file?ref=${encodeURIComponent(ref)}`, headers: { Authorization: `Bearer ${token}` }, throw: false })
-          if (sig.status >= 400 || !sig.json?.url) continue
-          const f = await requestUrl({ url: sig.json.url as string, throw: false })
+          if (sig.status >= 400 || !(sig.json as unknown as { url?: string })?.url) continue
+          const f = await requestUrl({ url: ((sig.json as unknown as { url?: string })?.url) ?? '', throw: false })
           bytes = f.arrayBuffer
         } else if (src.startsWith('data:')) {
           const m = src.match(/^data:([^;]+);base64,(.*)$/)
@@ -566,7 +566,7 @@ export default class MiStudioSyncPlugin extends Plugin {
       const r = await requestUrl({ url: `${root}/api/obsidian/export`, headers: { Authorization: `Bearer ${token}` }, throw: false })
       if (r.status === 401) { new Notice('MiStudio: clave inválida.'); return }
       if (r.status >= 400) { new Notice(`MiStudio: error ${r.status}.`); return }
-      folders = ((r.json as ExportResponse)?.folders) ?? []
+      folders = (((r.json as unknown as ExportResponse)?.folders) ?? [])
     } catch { new Notice('MiStudio: no se pudo conectar.'); return }
 
     const title = file.basename
@@ -586,7 +586,7 @@ export default class MiStudioSyncPlugin extends Plugin {
           body: JSON.stringify(payload), throw: false,
         })
         if (r.status >= 400) { new Notice(`MiStudio: error ${r.status} al crear.`); return }
-        resp = r.json
+        resp = (r.json as unknown as { ok?: boolean; folderId?: string; entryId?: string })
       } catch { new Notice('MiStudio: no se pudo crear.'); return }
       if (!resp?.ok || !resp.entryId || !resp.folderId) { new Notice('MiStudio: respuesta inesperada.'); return }
 
@@ -598,7 +598,7 @@ export default class MiStudioSyncPlugin extends Plugin {
           fm.source = 'mistudio'
           fm.synced = new Date().toISOString()
         })
-      } catch (e) { console.error('[MiStudio Sync] frontmatter', e) }
+      } catch (e) { console.error('[MiStudio Sync] frontmatter', (e as Error).message) }
       this.settings.journal[resp.entryId] = hashStr(md + '\n')
       await this.saveSettings()
       new Notice(choice.kind === 'existing' ? `Añadida a ${choice.name} en MiStudio.` : `Carpeta «${title}» creada en MiStudio.`)
@@ -657,7 +657,7 @@ class MiStudioSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this
     containerEl.empty()
-    new Setting(containerEl).setName('MiStudio Sync').setHeading()
+    new Setting(containerEl).setName('Configuración').setHeading()
     containerEl.createEl('p', { text: 'Trae tus carpetas de MiStudio a este vault. Genera la API key en {tu MiStudio}/obsidian.', cls: 'setting-item-description' })
 
     new Setting(containerEl).setName('URL de MiStudio').setDesc('Por defecto la app oficial. Cámbiala solo si usas un dominio propio.')

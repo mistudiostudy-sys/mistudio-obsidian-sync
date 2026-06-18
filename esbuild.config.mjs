@@ -1,6 +1,9 @@
 import esbuild from 'esbuild'
 import process from 'process'
-import builtins from 'builtin-modules'
+import { builtinModules } from 'node:module'
+
+// Módulos nativos de Node + sus variantes `node:`, marcados como externos.
+const builtins = [...builtinModules, ...builtinModules.map(m => `node:${m}`)]
 
 const prod = process.argv[2] === 'production'
 

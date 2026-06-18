@@ -27,7 +27,8 @@ Cada apunte lleva frontmatter (`mistudio_id`, `mistudio_folder_id`, `created`,
 > Necesitas Node.js instalado.
 
 ```bash
-cd integrations/obsidian-plugin
+git clone https://github.com/mistudiostudy-sys/mistudio-obsidian-sync.git
+cd mistudio-obsidian-sync
 npm install
 npm run build      # genera main.js
 ```
@@ -115,7 +116,7 @@ no lo borres. Si una tarea cambió en ambos lados, gana MiStudio. El texto y las
 fechas de las tareas siguen siendo de solo lectura (se regeneran desde MiStudio);
 edítalos en la app. El `Calendario.md` y la nota diaria son solo de bajada.
 
-## Limitaciones de esta versión (0.6.0)
+## Limitaciones de esta versión (0.8.1)
 
 - **Filofax (dos páginas)**: solo bajada.
 - **Tareas**: se devuelve el *check* (`done`); el texto, la fecha y crear/borrar
