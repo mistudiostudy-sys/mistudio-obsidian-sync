@@ -1,7 +1,7 @@
 {
   "id": "mistudio-sync",
   "name": "MiStudio Sync",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "minAppVersion": "1.4.0",
   "description": "Sincroniza carpetas, apuntes, tareas y calendario de MiStudio con tu vault: bajada siempre, subida two-way opcional (incl. check de tareas), nota diaria con el plan de Phil y sync selectivo por carpeta.",
   "author": "MiStudio",
